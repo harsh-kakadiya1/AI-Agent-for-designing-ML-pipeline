@@ -61,9 +61,9 @@
 
 % ══════════════════════════════════════════════════════════════════════════════
 \begin{abstract}
-This work presents MetaFlow, a metadata-driven AutoML framework that uses lightweight dataset profiles (sample size, feature types, imbalance, cardinality, and outlier density) to deterministically prune and re-rank candidate pipelines before training. Unlike black-box optimization systems that rely on extensive trial-and-error, MetaFlow encodes concise, interpretable rules to avoid evaluating clearly unsuitable learners, reducing compute by pruning the search space (reported here as $\sim$67\%). The primary contribution is a practical "grey-box" approach that trades exhaustive search breadth for targeted efficiency using human-interpretable constraints and prioritization.
+This work introduces MetaFlow, a lightweight AutoML pipeline selection framework based on metadata, which automatically prunes and re-ranks candidate pipelines before training such that the available information about the data sample's size, types of features and their potential imbalance, their cardinality and their outlier density is used deterministically without having to train each different pipeline separately. MetaFlow uses a small number of rules with high semantic content that are easily interpretable to avoid evaluating clearly inappropriate learners and can achieve compute savings by pruning the search space reported here as $\sim$67\%. Its main contribution is a practical ``grey-box'' strategy that executes a targeted search for efficiency instead of searching through the breadth of possible options using human-interpretable constraints and prioritization.
 
-It is emphasized that MetaFlow is complementary to, rather than a replacement for, modern AutoML toolkits: it is intended to provide inexpensive, data-driven pruning and warm-start guidance, which can be combined with Auto-sklearn, FLAML, or other optimizers. Limitations are also highlighted: the rule thresholds (e.g., categorical cut-offs, missingness) are heuristic and dataset-dependent, and the empirical study focuses on representative tabular cases rather than an exhaustive benchmark. A reproducibility checklist and a benchmarking protocol are described to facilitate direct comparison with state-of-the-art AutoML systems.
+The important note is that the pruning and warm-start tips from the perspective of Data analysis are proposed giving it as an alternate inexpensive approach to modern AutoML toolkits like Auto-sklearn, FLAML, etc. Constraints are also noted: The higher (or categorical) thresholds (such as percentage of missingness) are heuristic and data set dependent, and only representative tabular cases are studied as data sets for empirical support rather than a comprehensive benchmark. A reproducibility checklist and a benchmarking protocol are explained in order to be able to easily compare with other state of the art AutoML systems.
 
 \keywords{AutoML \and metadata \and pipeline selection \and meta-learning \and algorithm selection \and data profiling \and preprocessing}
 \end{abstract}
@@ -72,38 +72,27 @@ It is emphasized that MetaFlow is complementary to, rather than a replacement fo
 \section{Introduction}
 \label{sec:intro}
 
-Designing effective machine learning pipelines encompassing data cleaning,
-feature engineering, algorithm selection, and hyperparameter tuning demands
-substantial domain expertise and computational effort.
-AutoML systems address this challenge by automating the search over pipeline
-configurations.  Auto-WEKA~\cite{thornton2013auto} first formalised the
-\emph{Combined Algorithm Selection and Hyperparameter} (CASH) problem, while
-Auto-sklearn~\cite{feurer2015efficient} introduced meta learning and
-warm-starting.  Contemporary methods employ Bayesian
-optimisation~\cite{bergstra2011algorithms}, genetic
-programming~\cite{olson2016tpot}, and random
-search~\cite{li2017hyperband} powerful but computationally intensive approaches
-  that often evaluate many unsuitable candidates before converging.
+Creating robust machine learning workflows that involve data cleaning, feature engineering, algorithm selection and hyperparameter optimization, requires significant domain expertise and computational resources. The challenge is met by the AutoML systems by automating the search over pipeline configurations. The issue of hyperparameter optimisation and algorithm selection was first formalised by Auto-WEKA~\cite{thornton2013auto}, and Auto-sklearn introduced meta-learning and warm-starting~\cite{feurer2015efficient}. Modern techniques include Bayesian optimization~\cite{bergstra2011algorithms}, genetic programming~\cite{olson2016tpot} and random search~\cite{li2017hyperband} which are powerful but time-consuming, often searching many sub-optimal candidates.
 
-An alternative approach relies on dataset \emph{metadata} comprising structural and statistical properties to warm-start or constrain the search space via a complementary paradigm~\cite{leite2012survey}. Dataset attributes such as sample size, feature types, missingness, outlier density, and class imbalance can guide an automated system to discard unsuitable algorithms \emph{before} training begins~\cite{wang2021flaml}. This work presents an end-to-end framework named \textbf{MetaFlow} that extracts metadata and leverages it to automatically detect task types, apply target transformations, prioritize candidate models, and evaluate pipelines without exhaustive search. The investigation is guided by two primary research questions: \textbf{RQ1 (Efficacy):} Can lightweight dataset metadata accurately detect task types and rank appropriate learning algorithms? \textbf{RQ2 (Efficiency):} Does metadata-based pruning substantially reduce computational cost compared to exhaustive selection?
+A different method is based on dataset \emph{metadata} that encodes structural and statistical properties to choose, in a complementary paradigm, the search space to be warmed-up or constrained, using a framework from~\cite{leite2012survey}. Preventing the usage of inappropriate algorithms \emph{before} the training process should be possible through prior knowledge of dataset characteristics, e.g., dataset size, feature types, missingness, outliers, and class imbalance, as an automated system can be programmed to do so~\cite{wang2021flaml}. This work introduces \textbf{MetaFlow}, which extracts metadata to automatically detect tasks, apply target transformations, rank models, and evaluate pipelines without exhaustive search. To guide the investigation, two main research questions are formulated: \textbf{RQ1 (Efficacy):} Can lightweight dataset metadata accurately detect the type of task and rank the learning algorithms that are appropriate? \textbf{RQ2 (Efficiency):} Does metadata-based pruning significantly impact the amount of computation compared to testing all methods?
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Related Work}
 \label{sec:related}
 
-The CASH problem formalizes the joint search over algorithms and hyperparameters. Auto-WEKA~\cite{thornton2013auto} pioneered Bayesian optimization (SMAC/TPE) for this hierarchical space, requiring many expensive black-box evaluations. TPOT~\cite{olson2016tpot} employs genetic programming to evolve flexible pipeline structures, though at high computational cost. FLAML~\cite{wang2021flaml} and LightAutoML propose frugal optimization strategies that prioritize low-cost learners, yet these frameworks still rely on empirical trial-and-error rather than \emph{a priori} dataset reasoning.
+The CASH problem is a joint search over algorithms and hyperparameters. It was first explored and utilized by Auto-WEKA~\cite{thornton2013auto} which used a number of high-cost inferences on the black-box in this hierarchical space. TPOT~\cite{olson2016tpot} uses genetic programming to create flexible pipeline structures, but requires high computation cost in the process. Although frugal optimizers like FLAML~\cite{wang2021flaml} emphasize low-cost learners, they ignore \emph{a priori} dataset reasoning.
 
-Meta-learning frames algorithm selection as supervised learning over prior experimental results. Auto-sklearn~\cite{feurer2015efficient} advances this via warm-starting from a meta-knowledge repository (OpenML~\cite{vanschoren2013openml}), using statistical, information-theoretic, and landmarking meta-features~\cite{leite2012survey}. Although effective, this approach requires large, computationally expensive-to-maintain offline repositories.
+Meta-learning proposes algorithm selection as a supervised learning problem to previous experimental outcomes. This is boosted by Auto-sklearn~\cite{feurer2015efficient} which relies on warm starting from a meta-knowledge repository (OpenML~\cite{vanschoren2013openml}) and statistical, information theoretic and landmarking meta-features for transfer learning~\cite{leite2012survey}. This works, but needs very large, and bulky to maintain, offline repositories.
 
-Beyond algorithm choice, metadata also governs preprocessing decisions. High-cardinality categoricals often necessitate target encoding rather than one-hot encoding, and imputation strategies can affect downstream performance more than classifier choice~\cite{li2021cleanml}.
+In addition to algorithm selection, metadata plays a role in determining pre-processing decisions. Target encoding is often more suitable for categoricals with large numbers of categories than one-hot encoding, and imputing strategies have more impact on downstream performance than does the choice of classification model~\cite{li2021cleanml}.
 
 \subsection{Domain-Specific Implementations}
-Domain-specific machine learning methodologies have achieved notable success in specialized tasks, including solar power forecasting \cite{dhaked2023power, dhaked2025exploring}, wind turbine pitch control \cite{narayanan2024improved}, medical cyber-physical systems \cite{dhaked2025recent}, epidemic forecasting \cite{dhaked2025prediction}, and power grid contingency ranking \cite{dhaked2025ensemble}. However, these applications rely on customized, manually designed pipelines. This underscores the need for generalized, metadata-driven AutoML frameworks that can automatically select suitable models based on dataset properties.
+To conclude, domain knowledge-based machine learning techniques have shown great success in specialized problem domains such as solar power forecasting~\cite{dhaked2023power, dhaked2025exploring}, wind turbine pitch control~\cite{narayanan2024improved}, medical system cyber physical security~\cite{dhaked2025recent}, epidemic forecasting~\cite{dhaked2025prediction}, and in ranking power grid contingencies~\cite{dhaked2025ensemble}. However, such applications are based on manually designed and custom pipelines. This highlights the demand for general metadata-driven AutoML frameworks capable of automatically optimizing towards an appropriate model given the dataset characteristics.
 
 \subsection{Research Gap and Contribution}
-A gap exists between pure optimization (which is general but slow) and pure meta-learning (which requires massive training logs). Existing systems rely on metadata for initialization only, then perform black-box search, and few frameworks employ \emph{hard constraints} to deterministically prune the search space. MetaFlow bridges this gap with a ``grey-box'' technique: the matching of interpretable metadata is performed directly to pipeline decisions using a rule-based expert system, which casts out inappropriate candidates \emph{before} training begins~\cite{hutter2019automated}.
+Optimum (general but slow) and optimum meta-learning (massive training logs) lie in a range from one another. Currently, these systems will only use metadata at initialisation time to perform black-box search and few frameworks use \emph{hard constraints} to deterministically reduce the search space. MetaFlow addresses this mismatch in a ``grey-box'' fashion: The matching of interpretable metadata is performed right to pipeline decisions, making use of a rule-based expert system to narrow down the range of incompatible candidates \emph{before} training even starts~\cite{hutter2019automated}.
 
-Compared to contemporary AutoML, systems like Auto-sklearn use meta-features for warm-starting optimization~\cite{feurer2015efficient}, while FLAML prioritizes low-cost learners to trade accuracy for speed~\cite{wang2021flaml}. However, both methods still run numerous evaluations. By contrast, MetaFlow places deterministic, interpretable constraints at the front of the pipeline, pruning unsuitable models under transparent rules. This makes MetaFlow complementary: it narrows the search space using heuristics and hands the reduced pool to downstream optimizers for tuning.
+Many of the recent systems, such as Auto-sklearn~\cite{feurer2015efficient} and FLAML~\cite{wang2021flaml} have associated meta-features that they use for warm starting optimization and add speed trade-offs for low cost learners, respectively. But either technique still performs many evaluations. In contrast, MetaFlow offers interpretable real-time constraints at the beginning of the pipeline that directly eliminate undesirable models following a clear and simple set of rules. MetaFlow certainly finds its niche here: It reduces the dimension of the search space with heuristics and gives the small space to the tuners that are running optimizers downstream to fine-tune the model.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Methodology}
@@ -199,45 +188,14 @@ are easier to audit than opaque warm-start priors.
 % ── Metadata Extraction ───────────────────────────────────────────────────────
 \subsection{Metadata Extraction}
 
-Given feature matrix $X \in \mathbb{R}^{n \times p}$ and target vector $y$, the
-\texttt{MetadataExtractor} computes nine metadata groups: (1)~dataset dimensions
-$(n,p)$; (2)~feature types, re-classifying numeric columns with
-$\leq\!\tau_\text{cat}=10$ unique values as categorical; (3)~target statistics;
-(4)~quality profile (per-feature missing ratios, duplicate-row count);
-(5)~descriptive statistics (skewness, kurtosis per feature); (6)~outlier profile
-via the IQR rule; (7)~cardinality profile; (8)~Pearson correlations with the
-target; and (9)~class-imbalance profile, flagging \texttt{is\_highly\_imbalanced}
-when any class represents ${<}5\%$ of samples.  This metadata dictionary is the
-\emph{sole input} to all subsequent modules, ensuring every decision traces to a
-measurable dataset property.
-Several internal thresholds are heuristic choices: for example,
-$\tau_{\text{cat}}=10$ (reclassifying low-cardinality numerics as categorical)
-and $\theta_{\text{miss}}=0.5$ (feature drop threshold). These values were
-selected from common practice in applied ML and small-scale internal testing to
-produce stable, interpretable behaviour across diverse tabular datasets. Although
-such thresholds are dataset-dependent, Section \ref{sec:limitations} discusses
-sensitivity, how thresholds can be adapted, and outlines a sensitivity study
-as part of a reproducibility checklist.
+ The \texttt{MetadataExtractor} calculates nine groups of metadata: (1) the dimensions of the feature matrix $X$ and $y$; (2) feature types: numeric columns with $\leq \tau_{\text{cat}}=10$ unique values are classified as categorical; (3) target statistics; (4) quality profile: missing ratios per feature, duplicate-row count; (5) descriptive statistics: skewness and kurtosis per feature; (6) outlier profile: identifies values exceeding IQR boundaries; (7) cardinality profile: categorical value distributions; (8) Pearson correlations with $y$; (9) class-imbalance profile with \texttt{is\_highly\_imbalanced} as a flag when any class is with \textless{}5\% of the samples. All subsequent modules will use this metadata dictionary as their \emph{only input} so all decisions can be referred back to a property of this dataset that can be measured. Thresholds like $\theta_{\text{miss}} = 0.5$ and $\tau_{\text{cat}} = 10$ are heuristics chosen for stable, interpretable behavior on tabular data based on common ML practices. While such thresholds depend on the dataset, Section~\ref{sec:limitations} provides a discussion on how thresholds can be modified as well as a sensitivity study as a reproducibility checklist.
 
 % ── Task Detection & Preprocessing ───────────────────────────────────────────
 \subsection{Task Detection and Preprocessing}
 
-The \texttt{TaskDetector} infers classification vs.\ regression from $y$ via a
-rule chain (threshold $\tau_\text{cls}=20$, minimum samples-per-class
-$\tau_\text{min}=10$): non-numeric $y \Rightarrow$ classification (conf.\ 1.0);
-$|y_u|=2 \Rightarrow$ binary classification (0.95); integer $y$ with
-$|y_u|<\tau_\text{cls} \Rightarrow$ multiclass (0.90); $|y_u|>0.5n \Rightarrow$
-regression (0.95).
+The \texttt{TaskDetector} uses a rule chain (threshold $\tau_\text{cls}=20$ and minimum samples per class $\tau_\text{min}=10$) to determine classification vs.\ regression in $y$; assuming: non-numeric $y \Rightarrow$ classification (1.0); $|y_u|=2 \Rightarrow$ binary classification (0.95); integer $y$ with $|y_u|<\tau_\text{cls} \Rightarrow$ multiclass (0.90); $|y_u|>0.5n \Rightarrow$ regression (0.95).
 
-Before any pipeline is trained, \texttt{DataPreprocessor} performs a single pass:
-features with missing ratio ${>}\theta_\text{miss}=0.5$ are dropped; remaining
-missing values are imputed (median for numeric, mode for categorical); empty rows
-and rows with missing target are removed.  Inside each scikit-learn
-\texttt{Pipeline}, a \texttt{ColumnTransformer} applies standard scaling to
-numerical features and one-hot encoding (\texttt{handle\_unknown=`ignore'}) to
-categorical features.  Processed data are reused across all candidate pipelines
-for fair comparison.
-
+Before training, the \texttt{DataPreprocessor} drops features with missing ratios ${>}\theta_{\text{miss}}=0.5$, imputes missing values (median for numeric, mode for categorical), and removes rows with missing targets. Each scikit-learn \texttt{Pipeline} includes a \texttt{ColumnTransformer} to standard-scale numeric features and one-hot encode categorical features with \texttt{handle\_unknown=`ignore'}. Preprocessed data is shared across all candidate pipelines for a fair comparison.
 % ── Rule-Based Model Selection ────────────────────────────────────────────────
 \subsection{Rule-Based Model Selection}
 
@@ -269,7 +227,7 @@ Once the initial list is compiled the modifiers re-rank and add modifiers to the
 % ── Training, Evaluation, Selection ──────────────────────────────────────────
 \subsection{Training, Evaluation, and Selection}
 
-The dataset is partitioned into an 80\% training split and a 20\% held-out test split, utilizing stratified splitting for classification tasks to maintain target distribution. The optimal set of hyperparameters is obtained by performing a grid search (\texttt{GridSearchCV}) over a predefined parameter space using 5-fold cross-validation (CV) on the training set. For instance, the search grid for Random Forest spans \texttt{n\_estimators} $\in \{50, 100, 200\}$ and \texttt{max\_depth} $\in \{5, 10, \text{None}\}$, while for gradient-boosting algorithms (XGBoost, LightGBM), it spans \texttt{learning\_rate} $\in \{0.01, 0.1\}$ and \texttt{max\_depth} $\in \{3, 6\}$. The best-performing configuration is selected based on mean CV performance (accuracy for classification, $R^2$ for regression), refit on the entire training split, and evaluated on the test split. Evaluation metrics include accuracy, precision, recall, and weighted F1-score for classification, and $R^2$, Mean Squared Error (MSE), Root Mean Squared Error (RMSE), and Mean Absolute Error (MAE) for regression. Performance warnings are automatically raised if the test score falls below 0.70, the generalization gap (train--test difference) exceeds 0.10, or the cross-validation standard deviation $\sigma_{CV}$ exceeds 0.15. The most appropriate pipeline is decided upon based on the top scoring test metric and suggestions for optimization are provided with issues identified.
+The data is split 80/20, using stratified splitting for classification to maintain target distributions. A grid search (\texttt{GridSearchCV}) of a prescribed parameter space with 5-fold cross-validation (CV) on the training set is used to find the optimal set of hyperparameters. For example, the search space for Random Forest is \texttt{n\_estimators} $\in \{50, 100, 200\}$ and \texttt{max\_depth} $\in \{5, 10, \text{None}\}$, while for the gradient-boosting algorithms (XGBoost and LightGBM) it is \texttt{learning\_rate} $\in \{0.01, 0.1\}$ and \texttt{max\_depth} $\in \{3, 6\}$. The best-performing configuration is determined by mean CV performance (accuracy for classification \& $R^2$ for regression) with a refit on the entire training split (then tested on the test split). For classification, the metrics used for evaluation are accuracy, precision, recall, and weighted F1 score. For regression, metrics used for evaluation are $R^2$, Mean Squared Error (MSE), Root Mean Squared Error (RMSE), or Mean Absolute Error (MAE). Performance is examined across these datasets, with warnings triggered if the test score falls below 0.70, the train--test gap exceeds 0.10, or the cross-validation standard deviation $\sigma_{CV}$ exceeds 0.15. The most suitable pipeline is determined from the top-scoring test metric, and optimisation suggestions are given with issues identified.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Results}
@@ -359,36 +317,19 @@ Table~\ref{tab:all_results}.
 \section{Discussion}
 \label{sec:discussion}
 
-The four case studies answer both research questions: metadata was sufficient
-for the top-level task and model choices, and the pruning strategy consistently
-reduced the candidate set from nine models to three while preserving strong
-performance.  The main remaining limitation is the reliance on preset rule
-thresholds (e.g., $\tau_\text{cat}=10$, $\theta_\text{miss}=0.5$), which are
-interpretable but dataset-dependent.  D1 remains a small dataset, so even the
-slightly lower scores should be read as indicative rather than definitive.
+The four case studies answered both research questions: metadata alone was enough to guide top-level task and model choices, and the pruning strategy consistently reduced the candidate pool from nine models to three without sacrificing performance. The main limitation is the reliance on preset rule thresholds (like $\tau_\text{cat}=10$ and $\theta_\text{miss}=0.5$). While these are interpretable, they are dataset-dependent. Finally, because this is a very small dataset, the slightly lower scores should be seen as indicative rather than definitive.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Complexity, Limitations, and Deployment}
 \label{sec:limitations}
 
-To assess the practical viability of MetaFlow, this section presents a computational complexity analysis, discusses limitations, and outlines deployment challenges.
-
-\subsection{Computational Complexity Analysis}
-The computational footprint of MetaFlow comprises three phases. First, \textbf{metadata extraction} requires $O(N \cdot P)$ execution time and $O(P)$ memory to calculate statistical metrics over $N$ samples and $P$ features, running in seconds. Second, \textbf{rule evaluation} executes in $O(1)$ time and memory. Third, \textbf{training and tuning} complexity is reduced from $O(M \cdot H \cdot f \cdot T_{\text{train}})$ to $O(k \cdot H \cdot f \cdot T_{\text{train}})$ by pruning candidate models from $M$ to $k$ ($k \ll M$), yielding a $\sim$67\% tuning speedup. Finally, \textbf{inference complexity} scales efficiently by filtering out models with quadratic inference cost (e.g., $k$-NN, which requires $O(N \cdot P)$ per query) in favor of tree or linear structures costing $O(P)$.
-
-\subsection{Limitations and Deployment Challenges}
-MetaFlow has several limitations and deployment challenges. First, the selection rules rely on \textbf{heuristic thresholds} (e.g., a 5\% imbalance cutoff), which may require domain-specific calibration. Second, the system is designed strictly for \textbf{tabular data} and does not support unstructured modalities like images or text. Third, \textbf{deployment in CI/CD pipelines} faces challenges from schema drift and shifting target distributions, where changing dataset profiles will dynamically alter model recommendations, requiring robust monitoring to prevent regression.
-
-\subsection{Benchmarking and Reproducibility}
-The present study focuses on representative case studies rather than a full benchmark. A fair follow-up comparison should use identical splits, nested cross-validation, matched time budgets, and report both predictive metrics and evaluation cost. Full reproduction commands and scripts are provided in REPRODUCIBILITY.md.
+To assess the practical viability of MetaFlow, this section presents a computational complexity analysis, discusses its limitations, and outlines deployment challenges.\subsection{Computational Complexity Analysis}MetaFlow operates in three distinct phases. First, \textbf{metadata extraction} requires $O(N \cdot P)$ execution time and $O(P)$ memory to compute statistical metrics over $N$ samples and $P$ features, completing in seconds. Second, \textbf{rule evaluation} executes in $O(1)$ time and memory. Third, by pruning the candidate pool from $M$ down to $k$ models ($k \ll M$), the \textbf{training and tuning} complexity is reduced from $O(M \cdot H \cdot f \cdot T_{\text{train}})$ to $O(k \cdot H \cdot f \cdot T_{\text{train}})$, yielding a $\sim$67\% training speedup. Finally, \textbf{inference complexity} is kept highly efficient by avoiding models with quadratic inference costs (e.g., $k$-NN, which requires $O(N \cdot P)$ per query) in favor of tree-based or linear structures that cost only $O(P)$.\subsection{Limitations and Deployment Challenges}MetaFlow faces several limitations and hurdles in real-world deployment. First, the selection rules rely on \textbf{heuristic thresholds} (e.g., a 5\% cutoff for class imbalance), which may require domain-specific calibration. Second, the system is designed strictly for \textbf{tabular data} and cannot process unstructured modalities like images or text. Third, \textbf{deployment in CI/CD pipelines} is complicated by schema drift and shifting target distributions. Because evolving dataset profiles will dynamically alter model recommendations, robust monitoring is essential to prevent performance regressions.\subsection{Benchmarking and Reproducibility}This study focuses on representative case studies rather than a comprehensive benchmark. A rigorous follow-up comparison should use identical data splits, nested cross-validation, and matched time budgets, reporting both predictive performance and evaluation costs. Complete reproduction commands and scripts are provided in REPRODUCIBILITY.md.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Conclusion}
 \label{sec:conclusion}
 
-This work introduced an AutoML framework named \textbf{MetaFlow} that leverages dataset metadata including size, dimensionality, imbalance, skewness, and cardinality and adopts heuristic rules to deterministically narrow the search space. Experiments on four real-world datasets cover the four main types of tasks (binary classification, highly imbalanced classification, high-dimensional multiclass classification, and regression) and demonstrate that this grey-box approach reduces the number of model evaluations by $\sim$67\% while maintaining competitive predictive performance across all settings.
-
-The central finding is that treating metadata as hard constraints rather than mere initialization hints allows a system to eliminate ill-suited candidates before training, balancing search breadth and expert heuristics. Future work will extend the rule set with learned or LLM-assisted metadata interpretation.
+This work presents an AutoML framework called \textbf{MetaFlow}, which leverages dataset metadata such as size, dimensionality, imbalance, skewness, and cardinality alongside heuristic rules to deterministically narrow the search space. Experiments across four real-world datasets, covering various task types (binary classification, highly imbalanced classification, high-dimensional multiclass classification, and regression), demonstrate that this ``grey-box'' approach reduces model evaluations by $\sim$67\% while maintaining highly competitive predictive performance.The core idea is that treating metadata as hard constraints, rather than just initialization hints, allows the system to eliminate unsuitable candidates \emph{before} training begins. This strikes an effective balance between a broad automated search and expert heuristics. Future work will expand this rule set using learned or LLM-assisted metadata interpretation.
 
 \section*{Acknowledgement and Code}
 
