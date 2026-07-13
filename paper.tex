@@ -16,7 +16,7 @@
 \usepackage{algorithmic}
 \usepackage[hidelinks]{hyperref}
 \usepackage{url}
-\usepackage{natbib}
+\usepackage[square,numbers]{natbib}
 \usepackage{microtype}      % better justification
 \usepackage{float}
 \usepackage{placeins}       % \FloatBarrier
@@ -47,7 +47,7 @@
 \author{Harsh Kakadiya\inst{1} \and
         Juli Kyada\inst{1}    \and
         Kaushal Savaliya\inst{1} \and
-        Jalpesh Vasa\inst{1}}
+        Jalpesh Vasa\inst{1}\thanks{Corresponding author. Email: jalpeshvasa.it@charusat.ac.in}}
 \authorrunning{Harsh Kakadiya et al.}
 
 \institute{Department of Artificial Intelligence and Machine Learning,\\
@@ -87,7 +87,7 @@ Meta-learning proposes algorithm selection as a supervised learning problem to p
 In addition to algorithm selection, metadata plays a role in determining pre-processing decisions. Target encoding is often more suitable for categoricals with large numbers of categories than one-hot encoding, and imputing strategies have more impact on downstream performance than does the choice of classification model~\cite{li2021cleanml}.
 
 \subsection{Domain-Specific Implementations}
-To conclude, domain knowledge-based machine learning techniques have shown great success in specialized problem domains such as solar power forecasting~\cite{dhaked2023power, dhaked2025exploring}, wind turbine pitch control~\cite{narayanan2024improved}, medical system cyber physical security~\cite{dhaked2025recent}, epidemic forecasting~\cite{dhaked2025prediction}, and in ranking power grid contingencies~\cite{dhaked2025ensemble}. However, such applications are based on manually designed and custom pipelines. This highlights the demand for general metadata-driven AutoML frameworks capable of automatically optimizing towards an appropriate model given the dataset characteristics.
+To conclude, domain knowledge-based machine learning techniques have shown great success in specialized problem domains such as solar power forecasting~\cite{dhaked2023power} and wind turbine pitch control~\cite{narayanan2024improved}. However, such applications are based on manually designed and custom pipelines. This highlights the demand for general metadata-driven AutoML frameworks capable of automatically optimizing towards an appropriate model given the dataset characteristics.
 
 \subsection{Research Gap and Contribution}
 Optimum (general but slow) and optimum meta-learning (massive training logs) lie in a range from one another. Currently, these systems will only use metadata at initialisation time to perform black-box search and few frameworks use \emph{hard constraints} to deterministically reduce the search space. MetaFlow addresses this mismatch in a ``grey-box'' fashion: The matching of interpretable metadata is performed right to pipeline decisions, making use of a rule-based expert system to narrow down the range of incompatible candidates \emph{before} training even starts~\cite{hutter2019automated}.
@@ -139,7 +139,7 @@ prior to any model training and explicitly separates pruning, evaluation, and
 selection.
 
 % ── Pipeline figure ───────────────────────────────────────────────────────────
-\begin{figure}[t]
+\begin{figure}[!htbp]
 \centering
 \scalebox{0.78}{
 \begin{tikzpicture}[
@@ -201,7 +201,7 @@ Before training, the \texttt{DataPreprocessor} drops features with missing ratio
 
 The \texttt{RuleBasedModelSelector} mechanism for exhaustive algorithm search is solved by providing rules based on metadata that relate to the size, complexity, class imbalance and cardinality of the data, its density of outliers, and its distributional skewness. Sample count $n$ is binned into five tiers: \emph{tiny} ($<$1\,K), \emph{small} (1\,K--10\,K), \emph{medium} (10\,K--100\,K), \emph{large} (100\,K--1\,M), and \emph{huge} ($\geq$1,M). A complexity score is derived from: high dimensionality ($p>50$, $+2$), high $p/n$ ratio ($>0.1$, $+2$), categorical dominance ($>50\%$, $+1$), and moderately many features ($p>20$, $+1$), mapping to \emph{simple} ($\leq 2$), \emph{moderate} (3--4), or \emph{complex} ($\geq 5$). The size-tiered base model pools for both types of task are shown in Table~\ref{tab:model_rules}.
 
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \caption{Model pool by dataset-size tier. Models are selected based on
 dataset size and complexity; see text for modifier rules.}
@@ -242,7 +242,7 @@ Evaluation of MetaFlow was conducted on four real-world datasets:
 Table~\ref{tab:metadata_heatmap} summarises the key metadata properties;
 highlighted cells indicate conditions that trigger modifier rules.
 
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \caption{Metadata heatmap for D1--D4. Shading: \colorbox{hBlue}{\,blue\,}=minimal,
 \colorbox{hGreen}{\,green\,}=low, \colorbox{hYellow}{\,yellow\,}=moderate,
@@ -276,7 +276,7 @@ tree models for the tiny, high-dimensional case; and regression ensembles for
 house-price prediction.  The detailed scores are reported in
 Table~\ref{tab:all_results}.
 
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \caption{Model performance across all four datasets.}
 \label{tab:all_results}
@@ -334,6 +334,9 @@ This work presents an AutoML framework called \textbf{MetaFlow}, which leverages
 \section*{Acknowledgement and Code}
 
 The authors thank the Charotar University of Science and Technology (\href{https://www.charusat.ac.in/}{\textbf{CHARUSAT}}), Changa, India for support. The project codebase is available at \url{https://github.com/harsh-kakadiya1/AI-Agent-for-designing-ML-pipeline}.
+
+\section*{Declaration of Generative AI and AI-Assisted Technologies}
+During the preparation of this work, the authors used Large Language Models (LLMs) solely for the refinement of the manuscript and for generating the TikZ code for Figure 1. All final content has been thoroughly reviewed, verified, and edited by the authors, who take full responsibility for the paper's contents.
 
 \section*{}
 % ══════════════════════════════════════════════════════════════════════════════
