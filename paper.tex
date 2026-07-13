@@ -101,8 +101,7 @@ Many of the recent systems, such as Auto-sklearn~\cite{feurer2015efficient} and 
 MetaFlow is an end-to-end system that extracts structural and statistical
 metadata from a tabular dataset and uses it to drive every downstream
 decision   task detection, preprocessing, model selection, and evaluation  
-without exhaustive search. Figure~\ref{fig:metaflow} summarises the processing
-stages.
+without exhaustive search. Figure~\ref{fig:metaflow} shows the serpentine flow of processing stages, separating pipeline execution (left) from metadata-driven decisions (right).
 
 % ── Formal problem statement ─────────────────────────────────────────────────
 \subsection{Formal Problem Statement}
@@ -199,7 +198,7 @@ Before training, the \texttt{DataPreprocessor} drops features with missing ratio
 % ── Rule-Based Model Selection ────────────────────────────────────────────────
 \subsection{Rule-Based Model Selection}
 
-The \texttt{RuleBasedModelSelector} mechanism for exhaustive algorithm search is solved by providing rules based on metadata that relate to the size, complexity, class imbalance and cardinality of the data, its density of outliers, and its distributional skewness. Sample count $n$ is binned into five tiers: \emph{tiny} ($<$1\,K), \emph{small} (1\,K--10\,K), \emph{medium} (10\,K--100\,K), \emph{large} (100\,K--1\,M), and \emph{huge} ($\geq$1,M). A complexity score is derived from: high dimensionality ($p>50$, $+2$), high $p/n$ ratio ($>0.1$, $+2$), categorical dominance ($>50\%$, $+1$), and moderately many features ($p>20$, $+1$), mapping to \emph{simple} ($\leq 2$), \emph{moderate} (3--4), or \emph{complex} ($\geq 5$). The size-tiered base model pools for both types of task are shown in Table~\ref{tab:model_rules}.
+The \texttt{RuleBasedModelSelector} mechanism for exhaustive algorithm search is solved by providing rules based on metadata that relate to the size, complexity, class imbalance and cardinality of the data, its density of outliers, and its distributional skewness. Sample count $n$ is binned into five tiers: \emph{tiny} ($<$1\,K), \emph{small} (1\,K--10\,K), \emph{medium} (10\,K--100\,K), \emph{large} (100\,K--1\,M), and \emph{huge} ($\geq$1,M). A complexity score is derived from: high dimensionality ($p>50$, $+2$), high $p/n$ ratio ($>0.1$, $+2$), categorical dominance ($>50\%$, $+1$), and moderately many features ($p>20$, $+1$), mapping to \emph{simple} ($\leq 2$), \emph{moderate} (3--4), or \emph{complex} ($\geq 5$). The size-tiered base model pools for both tasks are shown in Table~\ref{tab:model_rules}, indicating how pool complexity scales with dataset size.
 
 \begin{table}[!htbp]
 \centering
@@ -239,8 +238,7 @@ Evaluation of MetaFlow was conducted on four real-world datasets:
 \textbf{D3 (Brain Cancer)}~\cite{feltes2019cumida} is a high-dimensional multiclass task ($n=130$, $p=54{,}676$ expression features across 5 classes). Features are filtered to the top 1,000 by variance.
 \textbf{D4 (House Sales)}~\cite{harlfoxem2016kc} is a regression task ($n=21{,}613$, $p=19$). Preprocessing includes log-transforms and one-hot encoding.
 
-Table~\ref{tab:metadata_heatmap} summarises the key metadata properties;
-highlighted cells indicate conditions that trigger modifier rules.
+Table~\ref{tab:metadata_heatmap} summarises key properties; highlighted cells (e.g., D2 imbalance, D3 high-dimensionality) trigger targeted modifier rules.
 
 \begin{table}[!htbp]
 \centering
@@ -273,8 +271,7 @@ Target skewness  & \cellcolor{hGreen}Low       & \cellcolor{hGreen}Low     & \ce
 MetaFlow selected sensible model families for each metadata regime: tree
 ensembles for the large, imbalanced, and nonlinear cases; lightweight linear and
 tree models for the tiny, high-dimensional case; and regression ensembles for
-house-price prediction.  The detailed scores are reported in
-Table~\ref{tab:all_results}.
+house-price prediction. The detailed scores in Table~\ref{tab:all_results} show that LightGBM performs best on D1 and D2, Decision Tree on D3, and XGBoost on D4, confirming the utility of metadata-guided pruning.
 
 \begin{table}[!htbp]
 \centering
